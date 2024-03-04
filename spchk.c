@@ -6,9 +6,10 @@
 #include <unistd.h>
 #include <limits.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 #define PATH "/usr/share/dict/words"
-#define MAX_STRINGS 313291
+#define MAX_STRINGS 313528
 #define MAX_LENGTH 100
 
 
@@ -28,23 +29,18 @@ void fix_word(char *word)
     int len = strlen(word);
     int i = 0, j = 0;
 
-    // Skip leading punctuation marks
     while (i < len && (word[i] == '\'' || word[i] == '\"' || word[i] == '(' || word[i] == '[' || word[i] == '{'))
     {
         i++;
     }
 
-    // Copy word characters until a trailing punctuation mark or whitespace is encountered
     while (i < len && !is_trailing_punctuation(word[i]) && !isspace(word[i]))
     {
         word[j++] = word[i++];
     }
 
-    // Null-terminate the modified word
     word[j] = '\0';
 }
-
-
 
 
 int binary_search(char **arr, const char *string){
@@ -63,7 +59,6 @@ int binary_search(char **arr, const char *string){
         }
     }
 
-    printf("FINAL COMP: %s\n", arr[low + (high - low) / 2]);
     return 0;
 
 }
@@ -74,7 +69,7 @@ void capitalize_initials(char *str)
 
     for (int i = 0; str[i] != '\0'; i++)
     {
-        if (isspace(str[i]) || ispunct(str[i]))
+        if ((isspace(str[i]) || (ispunct(str[i]) && str[i] != '\'')))
         {
             capitalize_next = 1;
         }
@@ -85,7 +80,7 @@ void capitalize_initials(char *str)
         }
         else
         {
-            str[i] = tolower(str[i]); // Ensure all non-initial letters are lowercase
+            str[i] = tolower(str[i]); 
         }
     }
 }
@@ -96,23 +91,36 @@ void check_spelling(const char *filepath, char **dict)
     if (file == NULL)
     {
         printf("Error opening file at: %s\n", filepath);
-        return;
+        exit(EXIT_FAILURE);
     }
 
-    char word[512];
+    char line[512];
+    int line_number = 0;
+    bool error_found = false;
 
-    while (fscanf(file, "%s", word) == 1)
+    while (fgets(line, sizeof(line), file) != NULL)
     {
-        fix_word(word);
-        // Trim leading and trailing whitespace
-        char *trimmed_word = strtok(word, " \t\n\r");
-        if (trimmed_word && binary_search(dict, trimmed_word) != 1) 
+        line_number++;
+        int column_number = 0;
+        char *word = strtok(line, " \t\n\r");
+        while (word != NULL)
         {
-            printf("%s : %s\n", filepath, trimmed_word);
+            fix_word(word);
+            if (binary_search(dict, word) != 1)
+            {
+                printf("%s (%d,%d): %s\n", filepath, line_number, column_number + 1, word);
+                error_found = true;
+            }
+            column_number += strlen(word) + 1; 
+            word = strtok(NULL, " \t\n\r");
         }
     }
 
     fclose(file);
+
+    if (error_found) {
+        exit(EXIT_FAILURE);
+    }
 }
 
 
@@ -121,7 +129,7 @@ void add_string(char **array, int index, const char *string) {
         fprintf(stderr, "Index out of bounds %d \n", index);
         return;
     }
-    array[index] = (char *)malloc((strlen(string) + 1) * sizeof(char)); // Allocate memory for the string
+    array[index] = (char *)malloc((strlen(string) + 1) * sizeof(char)); 
     if (array[index] == NULL) {
         perror("Memory allocation failed");
         return;
@@ -134,35 +142,44 @@ void add_string(char **array, int index, const char *string) {
 
 void create_dictionary(char **dict)
 {
-
     FILE *file = fopen(PATH, "r");
+    if (file == NULL) {
+        perror("Failed to open dictionary file");
+        return;
+    }
 
     char word[512];
     int idx = 0;
 
     while (fgets(word, sizeof(word), file) != NULL)
     {
-        if(strcmp(word, "A") == 0) printf("COMP WORKED");
+        // Remove newline character at the end of the word, if present
+        size_t len = strlen(word);
+        if (len > 0 && word[len - 1] == '\n') {
+            word[len - 1] = '\0'; 
+        }
+
         char lower[MAX_LENGTH];
         char caps[MAX_LENGTH];
 
         strcpy(lower, word);
         strcpy(caps, word);
 
-        for (int i = 0; lower[i]; i++)
-        {
+        for (int i = 0; lower[i]; i++) {
             lower[i] = tolower(lower[i]);
         }
-        capitalize_initials(caps);
 
-        if (strcmp(word, lower) != 0)
-        {
+        for (int i = 0; caps[i]; i++) {
+            caps[i] = toupper(caps[i]);
+        }
+        
+
+        if (strcmp(word, lower) != 0) {
             add_string(dict, idx, lower);
             idx++;
         }
 
-        if (strcmp(word, caps) != 0)
-        {
+        if (strcmp(word, caps) != 0) {
             add_string(dict, idx, caps);
             idx++;
         }
@@ -172,17 +189,16 @@ void create_dictionary(char **dict)
 
         capitalize_initials(lower);
 
-        if (strcmp(word, lower) != 0)
-        {
+        if (strcmp(word, lower) != 0) {
             add_string(dict, idx, lower);
             idx++;
         }
-
-        
     }
 
-    return;
+
+    fclose(file);
 }
+
 
 void traverse_dir(const char *dir_path, char **dict)
 {
@@ -241,5 +257,5 @@ int main()
 
     traverse_dir("test_dir", stringDict);
     
-    return EXIT_SUCCESS;
+    exit(EXIT_SUCCESS);
 }
