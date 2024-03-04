@@ -12,6 +12,8 @@
 #define MAX_STRINGS 313528
 #define MAX_LENGTH 100
 
+bool error_found = false;
+
 
 int is_txt_file(const char *filename)
 {
@@ -96,7 +98,7 @@ void check_spelling(const char *filepath, char **dict)
 
     char line[512];
     int line_number = 0;
-    bool error_found = false;
+    
 
     while (fgets(line, sizeof(line), file) != NULL)
     {
@@ -118,9 +120,6 @@ void check_spelling(const char *filepath, char **dict)
 
     fclose(file);
 
-    if (error_found) {
-        exit(EXIT_FAILURE);
-    }
 }
 
 
@@ -212,18 +211,22 @@ void traverse_dir(const char *dir_path, char **dict)
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL)
     {
-        if (entry->d_name[0] == '.')
+        // Skip the current and parent directory entries "." and ".."
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
         {
             continue;
         }
 
         char full_path[PATH_MAX];
-        snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry->d_name);
+        if (snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry->d_name) >= PATH_MAX) {
+            fprintf(stderr, "Path length has exceeded the limit: %s/%s\n", dir_path, entry->d_name);
+            continue;
+        }
 
         struct stat entry_stat;
         if (stat(full_path, &entry_stat) == -1)
         {
-            perror("stat");
+            perror("Failed to get file status");
             continue;
         }
 
@@ -234,6 +237,7 @@ void traverse_dir(const char *dir_path, char **dict)
         else if (S_ISREG(entry_stat.st_mode) && is_txt_file(entry->d_name))
         {
             check_spelling(full_path, dict);
+            
         }
     }
 
@@ -256,6 +260,10 @@ int main()
     qsort(stringDict, MAX_STRINGS, sizeof(char *), compare_strings);
 
     traverse_dir("test_dir", stringDict);
+    
+    if (error_found) {
+        exit(EXIT_FAILURE);
+    }
     
     exit(EXIT_SUCCESS);
 }
