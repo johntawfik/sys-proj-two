@@ -8,12 +8,10 @@
 #include <ctype.h>
 #include <stdbool.h>
 
-#define PATH "/usr/share/dict/words" // change to cmd line args
-#define MAX_STRINGS 313528
 #define MAX_LENGTH 100
 
 bool error_found = false;
-
+int curr_size = 100000;
 
 int is_txt_file(const char *filename)
 {
@@ -47,7 +45,7 @@ void fix_word(char *word)
 
 int binary_search(char **arr, const char *string){
     int low = 0;
-    int high = MAX_STRINGS - 1;
+    int high = curr_size - 1;
 
     while (low <= high){
         int mid = low + (high - low) / 2;
@@ -87,51 +85,76 @@ void capitalize_initials(char *str)
     }
 }
 
-void check_spelling(const char *filepath, char **dict)
-{
+void check_spelling(const char *filepath, char **dict) {
     FILE *file = fopen(filepath, "r");
-    if (file == NULL)
-    {
+    if (file == NULL) {
         printf("Error opening file at: %s\n", filepath);
         exit(EXIT_FAILURE);
     }
 
     char line[512];
     int line_number = 0;
-    
 
-    while (fgets(line, sizeof(line), file) != NULL)
-    {
+    while (fgets(line, sizeof(line), file) != NULL) {
         line_number++;
         int column_number = 0;
-        char *word = strtok(line, " \t\n\r");
-        while (word != NULL)
-        {
-            fix_word(word);
-            if (binary_search(dict, word) != 1)
-            {
-                printf("%s (%d,%d): %s\n", filepath, line_number, column_number + 1, word);
-                error_found = true;
+        char *context;
+        char *word = strtok_r(line, " \t\n\r", &context);
+
+        while (word != NULL) {
+            fix_word(word); // Modify the word to remove leading/trailing punctuation, etc.
+            char *hyphen = strchr(word, '-');
+            if (hyphen) {
+                char* original_word = malloc(strlen(word) + 1);
+
+                if (original_word == NULL) {
+                    fprintf(stderr, "Failed to allocate memory.\n");
+                    exit(EXIT_FAILURE);
+                }
+
+                strcpy(original_word, word);
+
+
+                bool is_correct = true;
+                char *part = strtok(word, "-");
+                while (part != NULL && is_correct) {
+                    if (binary_search(dict, part) != 1) {
+                        is_correct = false;
+                    }
+                    part = strtok(NULL, "-");
+                }
+
+                if (!is_correct) {
+                    printf("%s (%d,%d): %s\n", filepath, line_number, column_number + 1, original_word);
+                    error_found = true;
+                }
+                free(original_word);
+            } else {
+                // No hyphen, check the word directly
+                if (binary_search(dict, word) != 1) {
+                    printf("%s (%d,%d): %s\n", filepath, line_number, column_number + 1, word);
+                    error_found = true;
+                }
             }
-            column_number += strlen(word) + 1; 
-            word = strtok(NULL, " \t\n\r");
+            column_number += strlen(word) + 1;
+            word = strtok_r(NULL, " \t\n\r", &context);
         }
     }
 
     fclose(file);
-
 }
 
 
+
 void add_string(char **array, int index, const char *string) {
-    if (index < 0 || index >= MAX_STRINGS) {
+    if (index < 0 || index >= curr_size) {
         fprintf(stderr, "Index out of bounds %d \n", index);
         return;
     }
     array[index] = (char *)malloc((strlen(string) + 1) * sizeof(char)); 
     if (array[index] == NULL) {
         perror("Memory allocation failed");
-        return;
+        exit(EXIT_FAILURE);
     }
     strcpy(array[index], string); 
     array[index][strlen(string)] = '\0'; 
@@ -139,12 +162,11 @@ void add_string(char **array, int index, const char *string) {
 
 
 
-void create_dictionary(char **dict)
-{
-    FILE *file = fopen(PATH, "r");
+char **create_dictionary(char **dict, char *dict_path) {
+    FILE *file = fopen(dict_path, "r");
     if (file == NULL) {
         perror("Failed to open dictionary file");
-        return;
+        exit(EXIT_FAILURE);
     }
 
     char word[512];
@@ -152,7 +174,18 @@ void create_dictionary(char **dict)
 
     while (fgets(word, sizeof(word), file) != NULL)
     {
-        // Remove newline character at the end of the word, if present
+        if (idx >= curr_size - 6) {
+            char **tempDict = (char **)realloc(dict, curr_size * 2 * sizeof(char *));
+            if (tempDict == NULL) {
+                printf("Memory reallocation failed.\n");
+                free(dict);
+                exit(EXIT_FAILURE);
+            } else {
+                dict = tempDict;
+                curr_size *= 2;
+            }
+        }
+
         size_t len = strlen(word);
         if (len > 0 && word[len - 1] == '\n') {
             word[len - 1] = '\0'; 
@@ -196,6 +229,7 @@ void create_dictionary(char **dict)
 
 
     fclose(file);
+    return dict;
 }
 
 
@@ -218,6 +252,7 @@ void traverse_dir(const char *dir_path, char **dict)
         }
 
         char full_path[PATH_MAX];
+
         if (snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry->d_name) >= PATH_MAX) {
             fprintf(stderr, "Path length has exceeded the limit: %s/%s\n", dir_path, entry->d_name);
             continue;
@@ -251,22 +286,43 @@ int compare_strings(const void *a, const void *b)
     return strcmp(str1, str2);
 }
 
-int main(int argc, int *argv[])
+int main(int argc, char *argv[])
 {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <directory_path>\n", argv[0]);
+    //ARG FORMAT: ./spchk ../dict ../testfile
+    if (argc != 3) {
+        fprintf(stderr, "Improper Argument Usage: %s <directory_path>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
     
-    char **stringDict = (char **)calloc(MAX_STRINGS, sizeof(char *));
-    create_dictionary(stringDict);
+    char **stringDict = (char **)calloc(curr_size, sizeof(char *));
+    if (stringDict == NULL) {
+        perror("Failed to allocate memory for the dictionary");
+        exit(EXIT_FAILURE);
+    }
+    stringDict = create_dictionary(stringDict, argv[1]);
+
+    for(int i = 0; i < curr_size; i++){
+        if(stringDict[i] == NULL){
+            char **tempDict = (char **)realloc(stringDict, (i * sizeof(char *)));
+            if (tempDict == NULL) {
+                printf("Memory reallocation failed.\n");
+                free(stringDict);
+                exit(EXIT_FAILURE);
+            } else {
+                stringDict = tempDict;
+                curr_size = i;
+                break;
+            }
+        }
+    }
 
     //ASCII SORTING DICT FOR BINARY SEARCH, DO NOT REMOVE
-    qsort(stringDict, MAX_STRINGS, sizeof(char *), compare_strings);
+    qsort(stringDict, curr_size, sizeof(char *), compare_strings);
 
-    traverse_dir(argv[1], stringDict);
+    traverse_dir(argv[2], stringDict);
     
     if (error_found) {
+        printf("Incorrect words found, exiting with EXIT_FAILURE \n");
         exit(EXIT_FAILURE);
     }
     

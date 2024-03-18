@@ -1,27 +1,24 @@
-# Define the compiler
 CC=gcc
 
-
-
-# Define any compile-time flags
 CFLAGS=-Wall -g
 
-# Define the target executable name
 TARGET=spchk
 
-# The build target entry
+TEST_DICT=/usr/share/dict/words
+TEST_DIR=test_dir
+
 all: $(TARGET)
 
-# Rule for building the target
 $(TARGET): spchk.o
 	$(CC) $(CFLAGS) spchk.o -o $(TARGET)
 
-# Rule for compiling source files
 spchk.o: spchk.c
 	$(CC) $(CFLAGS) -c spchk.c
 
-# Rule for cleaning up generated files
+test: $(TARGET)
+	./$(TARGET) $(TEST_DICT) $(TEST_DIR)
+
 clean:
 	rm -f $(TARGET) *.o
 
-.PHONY: all clean
+.PHONY: all clean test
