@@ -8,7 +8,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 
-#define PATH "/usr/share/dict/words"
+#define PATH "/usr/share/dict/words" // change to cmd line args
 #define MAX_STRINGS 313528
 #define MAX_LENGTH 100
 
@@ -251,15 +251,20 @@ int compare_strings(const void *a, const void *b)
     return strcmp(str1, str2);
 }
 
-int main()
+int main(int argc, int *argv[])
 {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <directory_path>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    
     char **stringDict = (char **)calloc(MAX_STRINGS, sizeof(char *));
     create_dictionary(stringDict);
 
     //ASCII SORTING DICT FOR BINARY SEARCH, DO NOT REMOVE
     qsort(stringDict, MAX_STRINGS, sizeof(char *), compare_strings);
 
-    traverse_dir("test_dir", stringDict);
+    traverse_dir(argv[1], stringDict);
     
     if (error_found) {
         exit(EXIT_FAILURE);
