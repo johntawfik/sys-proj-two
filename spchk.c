@@ -130,7 +130,6 @@ void check_spelling(const char *filepath, char **dict) {
                 }
                 free(original_word);
             } else {
-                // No hyphen, check the word directly
                 if (binary_search(dict, word) != 1) {
                     printf("%s (%d,%d): %s\n", filepath, line_number, column_number + 1, word);
                     error_found = true;
@@ -238,8 +237,8 @@ void traverse_dir(const char *dir_path, char **dict)
     DIR *dir = opendir(dir_path);
     if (dir == NULL)
     {
-        perror("Unable to open directory");
-        exit(EXIT_FAILURE);
+            perror("Unable to open directory");
+            exit(EXIT_FAILURE);
     }
 
     struct dirent *entry;
@@ -289,7 +288,7 @@ int compare_strings(const void *a, const void *b)
 int main(int argc, char *argv[])
 {
     //ARG FORMAT: ./spchk ../dict ../testfile
-    if (argc != 3) {
+    if (argc < 3) {
         fprintf(stderr, "Improper Argument Usage: %s <directory_path>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
@@ -319,7 +318,14 @@ int main(int argc, char *argv[])
     //ASCII SORTING DICT FOR BINARY SEARCH, DO NOT REMOVE
     qsort(stringDict, curr_size, sizeof(char *), compare_strings);
 
-    traverse_dir(argv[2], stringDict);
+    for(int i = 2; i < argc; i++){
+        if(is_txt_file(argv[i])){
+            check_spelling(argv[i], stringDict);
+        }else{
+            traverse_dir(argv[i], stringDict);
+        }
+    }
+    
     
     if (error_found) {
         printf("Incorrect words found, exiting with EXIT_FAILURE \n");
