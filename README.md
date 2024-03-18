@@ -23,9 +23,9 @@ The spchk program compares words in text files to those in a specified dictionar
 
 Dictionary Management
 
-A dictionary file, sorted lexicographically with case sensitivity, serves as the reference for correct spelling. The program uses an efficient data structure (e.g., binary search trees, hash tables, or tries) for storing the dictionary and facilitating rapid lookups.
+A dictionary file, sorted lexicographically with case sensitivity, serves as the reference for correct spelling. The program uses an array for storing the dictionary and facilitating rapid lookups using binary search.
 
-Dictionary Structure: The dictionary is loaded into a suitable data structure that supports fast searches, considering ASCII case sensitivity. This setup is crucial for handling large dictionaries efficiently.
+Dictionary Structure: The dictionary is loaded into an array that we sort based upon ASCII values to facilitate fast searches in O(log(n)) time, considering ASCII case sensitivity and aspects such as hyphenation. This setup is crucial for handling large dictionaries efficiently.
 
 #### Text File Processing
 
@@ -42,9 +42,15 @@ Recursive Search: The program employs a recursive strategy to navigate through d
 
 
 ### Executables 
+  
     spchk.c - 
     - make 
-    - ./spchk 
+    - ./spchk <my_dict> <files/directories to be checked> 
+    - make test
+    - ./spchk /usr/share/dict/words test_dir my_file.txt 
+
+    Note: after you run "make test" it will say "command exited with non-zero status 1" because it exits with status "EXIT_FAILURE" due to finding words that are spelled incorrectly 
+
 
 
 ### Error Reporting
@@ -56,18 +62,19 @@ Recursive Search: The program employs a recursive strategy to navigate through d
 
  ### Correctness Testing
 
-    Word Detection Accuracy: Tests verify the program's ability to accurately identify words within text files, considering punctuation, capitalization, and hyphenation. By comparing output against known errors, these tests ensure that `spchk` reliably detects spelling mistakes.
+    Set up a directory named "test_dir" that we used to test our code functionality
 
-    Directory Traversal: This involves testing the program's ability to recursively traverse directories and correctly identify `.txt` files for spelling checks. Tests will include various directory structures to ensure comprehensive file coverage.
+    Inside the "test_dir" directory we included files such as "systems.systems" and "toye" to demonstrate how the program is supposed to ignore these files during the recursive directory traversal due to them not ending in ".txt". We also included files like ".john" to demonstrate how the program is supposed to ignore files that begin with ".".
 
-    Error Reporting: Tests assess the accuracy and format of error reports, ensuring that each spelling mistake is correctly identified with precise location details. This includes verifying the handling of multiple errors within a single file or across multiple files.
-
-
+    The rest of the files in test_dir are all valid text files and should be opened and checked. We have text files that are empty like "hello.txt", files with words that contain different capitalizations, hyphenated words, and trailing punctuation (check.txt) and then files that have words spelled incorrectly (text.txt)
+    
 
   #### Rationale Behind the Tests
 
-    Comprehensive Coverage: The testing suite is designed to cover all functional aspects of `spchk`, from basic spelling checks to more complex scenarios involving directory traversal and error reporting.
+    Our testing aims to satisfy the requirements of the project writeup. Each file incorporates at least one aspect of each of the different requirements:
 
-    Efficiency Evaluation: By including performance tests, the suite assesses the program's usability in real-world scenarios, ensuring that it operates efficiently even with large dictionaries and numerous files.
+    For trailing punctuation: We use "fix_word(word)" to preprocess each word before checking its spelling. This step modifies the word to remove leading and trailing punctuation mark. The "fix_word()" function iteratively removes these characters from the start and end of the word.
 
-    Error Handling: Ensuring accurate and user-friendly error reporting is crucial for a tool designed to aid in text correction. Tests focus on the clarity and precision of error messages.
+    For Hyphens: The function detects hyphenated words by searching for a hyphen character within each word using "char *hyphen = strchr(word, '-')". If a hyphen is found, the word is considered hyphenated. We then split the hyphentated word into its respective parts using "strtok_r(word, "-")" and checks each part against the dictionary using the binary search function. The word is considered correctly spelled only if all parts (hyphen separated) are found in the dictionary. 
+
+    For Capitalization: Took the different capitalization variants and put them in the array so we had all 3 variations of each word.
